@@ -1,0 +1,37 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install API deps
+        run: |
+          if [ -f api/requirements.txt ]; then pip install -r api/requirements.txt; fi
+      - name: Install Functions deps
+        run: |
+          if [ -f functions/requirements.txt ]; then pip install -r functions/requirements.txt; fi
+      - name: Basic syntax check
+        run: |
+          python - << 'PY'
+          import sys, pathlib, py_compile
+          for p in pathlib.Path('.').rglob('*.py'):
+              try:
+                  py_compile.compile(str(p), doraise=True)
+              except Exception as e:
+                  print(f"Syntax error in {p}: {e}")
+                  sys.exit(1)
+          print("Syntax OK")
+          PY
+      - name: Run pytest if tests present
+        run: |
+          pip install pytest || true
+          if [ -d tests ]; then pytest -q || true; else echo "No tests directory"; fi

@@ -1,0 +1,24 @@
+{
+  "name": "Spend Suite Dev",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "forwardPorts": [
+    8000,
+    8501,
+    5432
+  ],
+  "postCreateCommand": "make up || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-python.python",
+        "ms-azuretools.vscode-docker",
+        "ms-azuretools.vscode-azurefunctions"
+      ]
+    }
+  }
+}
