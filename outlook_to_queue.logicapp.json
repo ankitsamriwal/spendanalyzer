@@ -1,0 +1,103 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2016-06-01/Microsoft.Logic.json",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "type": "string",
+      "defaultValue": "qcf-outlook-to-queue"
+    },
+    "storageAccountName": {
+      "type": "string"
+    },
+    "queueName": {
+      "type": "string",
+      "defaultValue": "ingest-queue"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "uaenorth"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "definition": {
+          "$schema": "https://schema.management.azure.com/schemas/2016-06-01/Microsoft.Logic.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {},
+          "triggers": {
+            "When_a_new_email_arrives_V3": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['office365']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/v3/Mail/OnNewEmail",
+                "queries": {
+                  "folderPath": "Inbox",
+                  "importance": "Any",
+                  "fetchOnlyWithAttachment": false,
+                  "includeAttachments": true,
+                  "subjectFilter": "",
+                  "from": ""
+                }
+              },
+              "splitOn": "@triggerBody()?['value']"
+            }
+          },
+          "actions": {
+            "Compose_JSON_Payload": {
+              "type": "Compose",
+              "inputs": {
+                "source": "EMAIL",
+                "user_email": "@{triggerOutputs()?['body/from/emailAddress/address']}",
+                "from": "@{triggerOutputs()?['body/from/emailAddress/address']}",
+                "subject": "@{triggerOutputs()?['body/subject']}",
+                "received_at": "@{triggerOutputs()?['body/receivedDateTime']}",
+                "html": "@{triggerOutputs()?['body/bodyPreview']}"
+              }
+            },
+            "Put_message_on_queue": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azurequeues']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/v2/storageAccounts/@{encodeURIComponent(parameters('storageAccountName'))}/queues/@{encodeURIComponent(parameters('queueName'))}/messages",
+                "body": {
+                  "messageText": "@{base64(string(outputs('Compose_JSON_Payload')))}"
+                }
+              }
+            }
+          }
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "office365": {
+                "connectionId": "/subscriptions/<SUB>/resourceGroups/<RG>/providers/Microsoft.Web/connections/office365",
+                "connectionName": "office365",
+                "id": "/subscriptions/<SUB>/providers/Microsoft.Web/locations/<LOC>/managedApis/office365"
+              },
+              "azurequeues": {
+                "connectionId": "/subscriptions/<SUB>/resourceGroups/<RG>/providers/Microsoft.Web/connections/azurequeues",
+                "connectionName": "azurequeues",
+                "id": "/subscriptions/<SUB>/providers/Microsoft.Web/locations/<LOC>/managedApis/azurequeues"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
