@@ -1,0 +1,30 @@
+name: Deploy Azure Functions
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'functions/**'
+      - '.github/workflows/deploy-functions.yml'
+
+jobs:
+  deploy-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ensure host.json exists for the Functions app
+      - name: Ensure host.json & include shared code
+        run: |
+          if [ ! -f functions/host.json ]; then
+            echo '{ "version": "2.0", "extensionBundle": { "id": "Microsoft.Azure.Functions.ExtensionBundle", "version": "[3.*, 4.0.0)" } }' > functions/host.json
+          fi
+          rsync -a shared/ functions/shared/ || true
+
+      - name: Deploy with publish profile
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ secrets.AZ_FUNCAPP_NAME }}
+          package: functions
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          scm-do-build-during-deployment: true
